@@ -32,5 +32,41 @@ int check_heap() {
             }
         }
     */
+
+    sbrk_block *field = sbrk_blocks;
+        while(field!=NULL){
+            memory_block_t* current = (memory_block_t*) field->sbrk_start;
+            while(current <= (memory_block_t*) field->sbrk_end){
+                if (current->block_size_alloc > get_size(current)){
+                    return -1;
+                }
+                current = (memory_block_t*) ((uintptr_t) current + get_size(current));
+            }
+            field = field->next;
+        }
+
+
+    memory_block_t *block = free_head;
+    while (block != NULL){
+        if (check_malloc_output(get_payload(block), block->block_size_alloc) == -1) {
+            return -1;
+        }
+        block = block->next;
+    }
+
+    
+
+    field = sbrk_blocks;
+    while(field!=NULL){
+        memory_block_t* current = (memory_block_t*) field->sbrk_start;
+        while(current <= (memory_block_t*) field->sbrk_end){
+            if ((uintptr_t) current % ALIGNMENT !=0){
+                return -1;
+            }
+            current = (memory_block_t*) ((uintptr_t) current + get_size(current));
+        }
+        field = field->next;
+    }
+
     return 0;
 }
