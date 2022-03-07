@@ -1,4 +1,3 @@
-
 #include "umalloc.h"
 #include "csbrk.h"
 
@@ -33,37 +32,36 @@ int check_heap() {
         }
     */
 
+ 
+
     sbrk_block *field = sbrk_blocks;
-        while(field!=NULL){
-            memory_block_t* current = (memory_block_t*) field->sbrk_start;
-            while(current <= (memory_block_t*) field->sbrk_end){
-                if (current->block_size_alloc > get_size(current)){
-                    return -1;
-                }
-                current = (memory_block_t*) ((uintptr_t) current + get_size(current));
+    while(field!=NULL){
+        memory_block_t* block = (memory_block_t*) field->sbrk_start;
+        while(block <= (memory_block_t*) field->sbrk_end){
+            if (block->block_size_alloc > (field->sbrk_end-field->sbrk_start)){
+                return -1;
             }
-            field = field->next;
+            block = (memory_block_t*) ((uintptr_t) block + get_size(block));
         }
-
-
-    memory_block_t *block = free_head;
-    while (block != NULL){
-        if (check_malloc_output(get_payload(block), block->block_size_alloc) == -1) {
-            return -1;
-        }
-        block = block->next;
+        field = field->next;
     }
 
-    
+       memory_block_t *current = free_head;
+    while (current != NULL){
+        if (check_malloc_output(get_payload(current), get_size(current)) == -1 && !is_allocated(current) ) {
+            return -1;
+        }
+        current = current->next;
+    }
 
     field = sbrk_blocks;
     while(field!=NULL){
-        memory_block_t* current = (memory_block_t*) field->sbrk_start;
-        while(current <= (memory_block_t*) field->sbrk_end){
-            if ((uintptr_t) current % ALIGNMENT !=0){
+        memory_block_t* block = (memory_block_t*) field->sbrk_start;
+        while(block <= (memory_block_t*) field->sbrk_end){
+            if ((uintptr_t) block % ALIGNMENT !=0){
                 return -1;
             }
-            current = (memory_block_t*) ((uintptr_t) current + get_size(current));
+            block = (memory_block_t*) ((uintptr_t) block + get_size(block));
         }
         field = field->next;
     }

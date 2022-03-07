@@ -17,8 +17,7 @@ memory_block_t *free_head;
 /*
  * is_allocated - returns true if a block is marked as allocated.
  */
-bool is_allocated(memory_block_t *block)
-{
+bool is_allocated(memory_block_t *block) {
     assert(block != NULL);
     return block->block_size_alloc & 0x1;
 }
@@ -26,8 +25,7 @@ bool is_allocated(memory_block_t *block)
 /*
  * allocate - marks a block as allocated.
  */
-void allocate(memory_block_t *block)
-{
+void allocate(memory_block_t *block) {
     assert(block != NULL);
     block->block_size_alloc |= 0x1;
 }
@@ -36,8 +34,7 @@ void allocate(memory_block_t *block)
 /*
  * deallocate - marks a block as unallocated.
  */
-void deallocate(memory_block_t *block)
-{
+void deallocate(memory_block_t *block) {
     assert(block != NULL);
     block->block_size_alloc &= ~0x1;
 }
@@ -45,21 +42,15 @@ void deallocate(memory_block_t *block)
 /*
  * get_size - gets the size of the block.
  */
-size_t get_size(memory_block_t *block)
-{
+size_t get_size(memory_block_t *block) {
     assert(block != NULL);
-    return block->block_size_alloc & ~(ALIGNMENT - 1);
+    return block->block_size_alloc & ~(ALIGNMENT-1);
 }
-size_t round_up(size_t size){
-    return ((size + (ALIGNMENT-1)) & (-1*ALIGNMENT));
-}
-
 
 /*
  * get_next - gets the next block.
  */
-memory_block_t *get_next(memory_block_t *block)
-{
+memory_block_t *get_next(memory_block_t *block) {
     assert(block != NULL);
     return block->next;
 }
@@ -69,8 +60,7 @@ memory_block_t *get_next(memory_block_t *block)
  * Initializes the size and allocated fields, along with NUlling out the next 
  * field.
  */
-void put_block(memory_block_t *block, size_t size, bool alloc)
-{
+void put_block(memory_block_t *block, size_t size, bool alloc) {
     assert(block != NULL);
     assert(size % ALIGNMENT == 0);
     assert(alloc >> 1 == 0);
@@ -81,144 +71,180 @@ void put_block(memory_block_t *block, size_t size, bool alloc)
 /*
  * get_payload - gets the payload of the block.
  */
-void *get_payload(memory_block_t *block)
-{
+void *get_payload(memory_block_t *block) {
     assert(block != NULL);
-    return (void *)(block + 1);
+    return (void*)(block + 1);
 }
 
 /*
  * get_block - given a payload, returns the block.
  */
-memory_block_t *get_block(void *payload)
-{
+memory_block_t *get_block(void *payload) {
     assert(payload != NULL);
     return ((memory_block_t *)payload) - 1;
+}
+
+
+//puts a free block in memory address order into the list of free blocks
+memory_block_t *insertBlock(memory_block_t *free_address) {
+    if (free_head==NULL){
+        free_head = free_address;
+        return free_address;
+    }
+    memory_block_t* head_reference = free_head;
+    if ((uint64_t)free_address< (uint64_t)head_reference){
+        free_address->next = free_head;
+        free_head = free_address;
+        return free_address;
+    }
+    while(head_reference!=NULL){
+        if (head_reference->next == NULL){
+            head_reference->next=free_address;
+            return free_address;
+        }
+        if ((uint64_t)free_address < (uint64_t)head_reference->next){
+            free_address->next = head_reference->next;
+            head_reference->next=free_address;
+            return free_address;
+        }
+        head_reference = get_next(head_reference);
+    }
+    return free_address;
 }
 
 /*
  *  STUDENT TODO:
  *      Describe how you select which free block to allocate. What placement strategy are you using?
- * look through memory until the next block is null - this means that this block is empty. return this block
- * 
+ *      look through memory until the next block is null - this means that this block is empty. return this block
+ */
+
+/*
  * find - finds a free block that can satisfy the umalloc request.
  */
-memory_block_t *find(size_t size)
-{
-    //? STUDENT TODO
-    memory_block_t *tempHeadRef = free_head;
-    while (get_size(tempHeadRef) < size)
-    {
-        tempHeadRef = get_next(tempHeadRef);
-        if (tempHeadRef == NULL)
-        {
-            return NULL;
+memory_block_t *find(size_t size) {
+    memory_block_t* head_reference = free_head;
+    if (free_head==NULL){
+        return extend(size);
+    }
+    while (get_size(head_reference) < size){
+        head_reference = get_next(head_reference);
+        if (head_reference == NULL){
+            return extend(size);
         }
     }
-    return tempHeadRef;
+    return head_reference;
 }
 
 /*
  * extend - extends the heap if more memory is required.
  */
-memory_block_t *extend(size_t size)
-{
-    memory_block_t *tempHeadRef = free_head;
-    while (get_size(tempHeadRef) < size)
-    {
-        if (tempHeadRef->next == NULL)
-        {
-            memory_block_t *extra_block = (memory_block_t *)csbrk(PAGESIZE * 5);
-            put_block(extra_block, PAGESIZE * 5 - ALIGNMENT, false);
-            tempHeadRef->next = extra_block;
-            return tempHeadRef->next;
-        }
-        tempHeadRef = get_next(tempHeadRef);
-    }
-    return NULL;
-    return NULL;
+memory_block_t *extend(size_t size) {
+    memory_block_t* alloced_block = (memory_block_t*) csbrk(size);
+    put_block(alloced_block,size, true);
+    return alloced_block;
 }
 
 /*
  *  STUDENT TODO:
- *      Describe how you chose to split allocated blocks. Always? Sometimes? Never? Which end?
+ *     Describe how you chose to split allocated blocks. Always? Sometimes? Never? Which end?
  *     The split is based on the least significant end of the blocks in order of memory addresses. This 
- *      way the starting address of the block remains unchanged. This means that the memory addresses can stay the same.
+ *     way the starting address of the block remains unchanged. This means that the memory addresses can stay the same.
 */
 
 /*
  * split - splits a given block in parts, one allocated, one free.
  */
-memory_block_t *split(memory_block_t *block, size_t size)
-{
-    if (block->block_size_alloc < size)
-    {
+memory_block_t *split(memory_block_t *block, size_t size) {
+    //shrink free block
+    if (get_size(block)<size){
         return NULL;
     }
-    else
-    {
-        put_block(block, block->block_size_alloc - size, false);
-        memory_block_t *new_alloced_block = (memory_block_t *)((uintptr_t)block + get_size(block));
-        put_block(new_alloced_block, size, true);
-        return new_alloced_block;
-    }
+    memory_block_t* nextBlock = block->next; 
+    put_block(block, get_size(block)-size, false);
+    block->next = nextBlock;
+    //go to the least significant end and add block
+    memory_block_t* allocated_block = (memory_block_t*) ((uint64_t) block + get_size(block));
+    put_block(allocated_block, size, true);
+    return allocated_block;
 }
 
-memory_block_t *splice(memory_block_t *block) {
-    memory_block_t* temp_head_reference = free_head;
-    if (temp_head_reference->next == NULL){
-        return temp_head_reference;
+//gets the last block in the free list
+memory_block_t *get_prev(memory_block_t *block){
+    memory_block_t* temp = free_head;
+    if (temp->next == NULL){
+        return NULL;
     }
-    while (temp_head_reference->next != block){
-        if (temp_head_reference->next == NULL){
-            return temp_head_reference;
+    while (temp->next != block){
+        if (temp->next == NULL){
+            return NULL;
         }
-        temp_head_reference = get_next(temp_head_reference);
+        temp = get_next(temp);
     }
-    temp_head_reference->next = block->next;
-    return temp_head_reference;
+    return temp;
 }
 
-/*
- * coalesce - coalesces a free memory block with neighbors.
- */
-memory_block_t *coalesce(memory_block_t *block)
-{
-    memory_block_t *next = (memory_block_t *)((uintptr_t)block + get_size(block));
-    if (is_allocated(next))
-    {
-        splice(next);
-        put_block(block, get_size(block) + get_size(block), false);
-        free_head = block;
+//removes the given block from the free list while maintaining 
+memory_block_t *splice( memory_block_t *block) {
+    if (free_head==NULL){
         return block;
     }
-    return NULL;
+    if (block == free_head){
+        free_head = NULL;
+        block->next = NULL;
+        return block;
+    }
+    memory_block_t *prev = get_prev(block);
+    if (prev!=NULL){
+        prev->next = block->next;
+    }
+    block->next = NULL;
+    return block;
 }
 
 
+/*
+ * coalesce - coalesces a free memory with free blocks.
+ */
+memory_block_t *coalesce(memory_block_t *block) {
+    memory_block_t* neighbor = (memory_block_t*) ((uintptr_t) block + get_size(block));
+    if (neighbor==block->next && !is_allocated(neighbor)){
+        memory_block_t* neighborNext = neighbor->next;
+        put_block(block,get_size(block) + get_size (neighbor), false);
+        block->next = neighborNext;
+    }
+    else{
+        insertBlock(block);
+    }
+    return block;
+}
 
 /*
  * uinit - Used initialize metadata required to manage the heap
  * along with allocating initial memory.
  */
-int uinit()
-{
-    memory_block_t* new_alloced_block = (memory_block_t*) csbrk(PAGESIZE*5);
-    put_block(new_alloced_block, PAGESIZE*5-ALIGNMENT, false);
-    free_head = new_alloced_block;
+int uinit() {
+    free_head = (memory_block_t*) csbrk(PAGESIZE);
+    if (free_head == NULL){
+        return -1;
+    }
+    put_block(free_head, PAGESIZE, false);
     return 0;
 }
 
 /*
  * umalloc -  allocates size bytes and returns a pointer to the allocated memory.
  */
-void *umalloc(size_t size)
-{
-    size = round_up(size);
-    extend(size);
-    memory_block_t* addr = find(size);
-    if (addr != NULL){
-        return split(addr, size);
+void *umalloc(size_t size) {
+    size = ALIGN(size+ALIGNMENT);
+    memory_block_t* free_address = find(size);
+    if (free_address != NULL){
+        if ((get_size(free_address)-size) > 16)
+            return get_payload(split(free_address, size));
+        else{ //cannot split
+            allocate(free_address);
+            splice(free_address);
+            return (get_payload(free_address));
+        }
     }
     return NULL;
 }
@@ -228,22 +254,14 @@ void *umalloc(size_t size)
  *      Describe your free block insertion policy.
  *      rearrange the existing memory blocks (coalesce and splice)
  *      and then deallocate the memory. 
- * 
- *       
- * 
 */
 
 /*
  * ufree -  frees the memory space pointed to by ptr, which must have been called
  * by a previous call to malloc.
  */
-void ufree(void *ptr)
-{
-    memory_block_t* mem_to_free = ptr;
-    splice(mem_to_free);
-    if (coalesce(ptr) ==NULL){
-        deallocate(mem_to_free);
-        mem_to_free->next = free_head;
-        free_head = mem_to_free;
-    }   
+void ufree(void *ptr) {
+    memory_block_t* to_free = get_block((memory_block_t*) ptr);
+    deallocate(to_free);
+    coalesce(to_free);
 }
