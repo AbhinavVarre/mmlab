@@ -155,7 +155,6 @@ memory_block_t *extend(size_t size) {
  * split - splits a given block in parts, one allocated, one free.
  */
 memory_block_t *split(memory_block_t *block, size_t size) {
-    //shrink free block
     if (get_size(block)<size){
         return NULL;
     }
@@ -170,20 +169,20 @@ memory_block_t *split(memory_block_t *block, size_t size) {
 
 //gets the last block in the free list
 memory_block_t *get_prev(memory_block_t *block){
-    memory_block_t* temp = free_head;
-    if (temp->next == NULL){
+    memory_block_t* head_reference = free_head;
+    if (head_reference->next == NULL){
         return NULL;
     }
-    while (temp->next != block){
-        if (temp->next == NULL){
+    while (head_reference->next != block){
+        if (head_reference->next == NULL){
             return NULL;
         }
-        temp = get_next(temp);
+        head_reference = get_next(head_reference);
     }
-    return temp;
+    return head_reference;
 }
 
-//removes the given block from the free list while maintaining 
+//takes the given block out of the free list
 memory_block_t *splice( memory_block_t *block) {
     if (free_head==NULL){
         return block;
